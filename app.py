@@ -4,7 +4,7 @@ import numpy as np
 import requests
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
 # --------------------------------
 # PAGE CONFIG
@@ -64,11 +64,13 @@ features = [
 
 X = df[features]
 
+# Scale features
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-stress_model = RandomForestClassifier(n_estimators=100, random_state=42)
-risk_model = RandomForestClassifier(n_estimators=100, random_state=42)
+# Train Logistic Regression models
+stress_model = LogisticRegression(max_iter=500, random_state=42)
+risk_model = LogisticRegression(max_iter=500, random_state=42)
 
 stress_model.fit(X_scaled, df["stress_enc"])
 risk_model.fit(X_scaled, df["risk_enc"])
@@ -78,7 +80,7 @@ risk_model.fit(X_scaled, df["risk_enc"])
 # --------------------------------
 st.sidebar.header("🌦 Live Weather")
 
-API_KEY = "8d0bdfc2d7fe4af92beb0397c9c0797a"  # ← Replace with your OpenWeather API key
+API_KEY = "8d0bdfc2d7fe4af92beb0397c9c0797a"  # Replace with your API key
 
 try:
     if API_KEY != "":
@@ -94,31 +96,48 @@ try:
             st.sidebar.write(f"💧 Humidity: {humidity_live} %")
             st.sidebar.write(f"☁ Weather: {description_live}")
         else:
-            st.sidebar.warning("⚠ Unable to fetch live weather. Using test values.")
+            st.sidebar.warning("⚠ Unable to fetch live weather. Using default values.")
             temperature_live = 28.5
             humidity_live = 72
             description_live = "Partly Cloudy"
 except:
-    st.sidebar.warning("⚠ Error connecting to OpenWeather API. Using test values.")
+    st.sidebar.warning("⚠ Error connecting to OpenWeather API. Using default values.")
     temperature_live = 28.5
     humidity_live = 72
     description_live = "Partly Cloudy"
 
 # --------------------------------
-# INPUT SECTION
+# INPUT SECTION (Dynamic slider ranges)
 # --------------------------------
 st.header("📥 Climate Parameters")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    temperature = st.slider("Temperature (°C)", 15.0, 40.0, float(temperature_live))
-    rainfall = st.slider("Rainfall (mm)", 0.0, 50.0, 10.0)
+    temperature = st.slider(
+        "Temperature (°C)",
+        float(df['temperature_c'].min()), float(df['temperature_c'].max()),
+        float(temperature_live)
+    )
+    rainfall = st.slider(
+        "Rainfall (mm)",
+        float(df['rainfall_mm'].min()), float(df['rainfall_mm'].max()),
+        10.0
+    )
 
 with col2:
-    humidity = st.slider("Humidity (%)", 30.0, 100.0, float(humidity_live))
-    soil_moisture = st.slider("Soil Moisture (%)", 10.0, 80.0, 45.0)
+    humidity = st.slider(
+        "Humidity (%)",
+        float(df['humidity_pct'].min()), float(df['humidity_pct'].max()),
+        float(humidity_live)
+    )
+    soil_moisture = st.slider(
+        "Soil Moisture (%)",
+        float(df['soil_moisture_pct'].min()), float(df['soil_moisture_pct'].max()),
+        45.0
+    )
 
+# Heat index calculation
 heat_index = (temperature * humidity) / 100
 
 # --------------------------------
@@ -132,8 +151,10 @@ input_df = pd.DataFrame({
     "heat_index": [heat_index]
 })
 
+# Scale input
 input_scaled = scaler.transform(input_df)
 
+# Predict using Logistic Regression
 stress_pred = stress_model.predict(input_scaled)
 risk_pred = risk_model.predict(input_scaled)
 
